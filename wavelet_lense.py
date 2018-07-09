@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit, jitclass, float64, int64, void, boolean
 import cmath
-from wavelets import *
+from wavelets2 import *
 import seaborn as sns
 
 sns.set_style("ticks")
@@ -65,20 +65,11 @@ def gen_concave_points(p0, r, height, num):
 
 @jit()
 def calc_I(xs, ys, wavelets, t):
-    #x2, y2 = np.meshgrid(xs, ys)
     I = np.zeros((len(xs),len(ys)))
-    dy = np.diff(ys)[0] / 2
 
-    # t = 1.0
     for i in range(xs.shape[0]):
         for j in range(ys.shape[0]):
-            buf = 0.0
-            for n in range(len(wavelets)):
-                # for n in [0,num-1]:
-                buf += wavelets[n].calc_field(np.array([x[i], y[j]]), t) * wavelets[n].calc_probability(
-                    np.array([x[i], y[j] - dy]), np.array([x[i], y[j] + dy]))
-            I[j, i] += buf
-        print(i)
+            I[j, i] = wavelets.calc_field(np.array([x[i], y[j]]), t) # * probability of wavelet
 
     return I
 
@@ -97,30 +88,44 @@ plt.plot(concave1[:,0],concave1[:,1])
 plt.plot(concave2[:,0],concave2[:,1])
 plt.show()
 
-lense1_front = Surface(concave1, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.5)
-lense1_back = Surface(concave2, reflectivity=0.0, transmittance=1.0, n1=1.5, n2=1.0)
+lense1_front = Surface(concave1, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=2.0)
+lense1_back = Surface(concave2, reflectivity=0.0, transmittance=1.0, n1=2.0, n2=1.0)
 
 
-ys = np.linspace(-1, 1, num)
-planewave = []
-for y in ys:
-    planewave.append(
-        Wavelet(r=np.array([0.0, y]), k=np.array([-1.0, 0.0]), t0=0.0, wavelength=0.1, phase=0.0, pulsewidth=0.2,
-                spherical=True))
+rs = np.zeros((num,2))
+rs[:,0] = np.repeat(0.0,num)
+rs[:,1] = np.linspace(-1, 1, num)
 
-onlense = []
-for i, wavelet in enumerate(planewave):
-    for j in range(20):
-        pos, k, t, hit = lense1_front.interact(wavelet)
-        if hit:
-            onlense.append(Wavelet(r=pos, k=k, t0=t, wavelength=wavelet.wavelength, phase=wavelet.phase, pulsewidth=wavelet.pulsewidth, spherical=True))
 
-print(len(onlense))
+ks = np.zeros((num,2))
+ks[:,0] = np.repeat(1.0,num)
 
-x = np.linspace(-0.1, 3, 150)
+t0s = np.zeros((num))
+
+phases = np.zeros((num))
+
+
+planewave = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
+
+print(planewave.mode)
+
+x = np.linspace(-0.1, 4, 150)
 y = np.linspace(-1.5, 1.5, 150)
 
-I_plane = calc_I(x, y, onlense, 1.0)
+I_plane = calc_I(x, y, planewave, 1.0)
+
+
+plt.plot(concave1[:,0],concave1[:,1])
+plt.plot(concave2[:,0],concave2[:,1])
+plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap=sns.diverging_palette(240, 10, as_cmap=True))
+plt.savefig("plane_field_ref.png", dpi=300)
+plt.show()
+
+onlense1 = lense1_front.interact_with_all_wavelets(planewave)
+
+print(onlense1.n)
+
+I_plane = calc_I(x, y, onlense1, 1.0)
 
 plt.plot(concave1[:,0],concave1[:,1])
 plt.plot(concave2[:,0],concave2[:,1])
@@ -136,15 +141,19 @@ plt.imshow(I_plane ** 2, extent=(x.min(), x.max(), y.max(), y.min()),
 plt.savefig("plane__int_ref.png", dpi=300)
 plt.show()
 
-x = np.linspace(-0.4, 3.0, 300)
-y = np.linspace(-0.9, 0.9, 150)
+onlense2 = lense1_back.interact_with_all_wavelets(onlense1)
+print(onlense2.n)
 
-I_ref = calc_I(x, y, reflected, 8.5)
+I_ref = calc_I(x, y, onlense2, 8.5)
 
+plt.plot(concave1[:,0],concave1[:,1])
+plt.plot(concave2[:,0],concave2[:,1])
 plt.imshow(I_ref, extent=(x.min(), x.max(), y.max(), y.min()), cmap=sns.diverging_palette(240, 10, as_cmap=True))
 plt.savefig("field_ref.png", dpi=300)
 plt.show()
 
+plt.plot(concave1[:,0],concave1[:,1])
+plt.plot(concave2[:,0],concave2[:,1])
 plt.imshow(I_ref ** 2, extent=(x.min(), x.max(), y.max(), y.min()),
            cmap=sns.cubehelix_palette(start=0, rot=0.4, gamma=1.0, hue=0.8, light=1.0, dark=0.1, as_cmap=True))
 # plt.imshow(I**2,extent=(x.min(), x.max(), y.max(), y.min()))
