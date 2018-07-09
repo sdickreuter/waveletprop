@@ -4,7 +4,7 @@ locale.setlocale(locale.LC_NUMERIC, 'C')
 
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import jit, jitclass, float64, int64, void, boolean
+from numba import jit, jitclass, float64, int64, void, boolean,string
 import cmath
 
 # c = 2.998e8  # m/s
@@ -18,13 +18,13 @@ spec_Wavelet = [
     ('wavelength', float64),
     ('f', float64),
     ('pulsewidth', float64),
-    ('spherical', boolean),
+    ('mode', string),
 ]
 
 
 @jitclass(spec_Wavelet)
 class Wavelet(object):
-    def __init__(self, r, k, t0, wavelength, phase, pulsewidth, spherical):
+    def __init__(self, r, k, t0, wavelength, phase, pulsewidth, mode):
         self.r = r
         self.k = k / np.linalg.norm(k) * 2 * np.pi / wavelength
         self.t0 = t0
@@ -32,7 +32,7 @@ class Wavelet(object):
         self.wavelength = wavelength
         self.f = c / wavelength
         self.pulsewidth = pulsewidth  # seconds
-        self.spherical = spherical
+        self.mode = mode
 
     def calc_r(self, t):
         r = c * (t - self.t0)
@@ -60,12 +60,17 @@ class Wavelet(object):
         v2 = np.subtract(self.r, point2)
         phi1 = self.angle_between(v1, self.k).real
         phi2 = self.angle_between(v1, v2).real
-        if self.spherical:
+        if self.mode == "spherical":
             probability = np.abs((phi2) / (np.pi))
-        else:
+        elif self.mode == "gaussian":
             probability = 1 / (2 * np.pi) * (
                 np.sin(2 * phi1) + 2 * phi1 - np.sin(2 * (phi1 + phi2)) - 2 * (phi1 + phi2))
             probability = np.abs(probability)
+        elif self.mode == "ray":
+            if phi1 < phi2:
+                probability = 1.0
+            else:
+                probability = 0.0
         return probability
 
     # def unit_vector(self, vector):

@@ -52,27 +52,21 @@ def gen_rotation_matrix(theta):
 
 
 @jit()
-def gen_concave_points(p0, r0, height, num):
-    v = np.subtract(p0, r0)
-    # w = np.array(np.dot(gen_rotation_matrix(np.pi/2),v))
-    # w = w.reshape(v.shape)
-    # w = unit_vector(w)
-    # w = np.add(w*height/2,p0)
-    # phi = angle_between(v,w).real
-    # thetas = np.linspace(phi,-phi,num)
+def gen_concave_points(p0, r, height, num):
+    v = [r,0]
     thetas = np.linspace(height / 2, -height / 2, num)
     points = np.zeros((num, 2))
     for i, theta in enumerate(thetas):
         R = gen_rotation_matrix(theta)
         buf = np.dot(R, v)
-        points[i] = buf + r0 + p0
+        points[i] = p0 + buf
     return points
 
 
 @jit()
 def calc_I(xs, ys, wavelets, t):
-    x2, y2 = np.meshgrid(xs, ys)
-    I = np.zeros(x2.shape)
+    #x2, y2 = np.meshgrid(xs, ys)
+    I = np.zeros((len(xs),len(ys)))
     dy = np.diff(ys)[0] / 2
 
     # t = 1.0
@@ -90,35 +84,57 @@ def calc_I(xs, ys, wavelets, t):
 
 
 num = 100
-p0 = np.array([-0.5, 0.0])
-r0 = np.array([4.0, 0.0])
-concave = gen_concave_points(p0, r0, 1.0, num)
+p0 = np.array([0.0, 0.0])
+concave1 = gen_concave_points(p0, -1.0, np.pi, num)
+concave1[:,1]=concave1[:,1]*1
+concave1[:,0]+=1.5
+p0 = np.array([1.0, 0.0])
+concave2 = gen_concave_points(p0, 1.0, np.pi, num)
+concave2[:,1]=concave2[:,1]*1
+concave2[:,0]+=0.5
 
-# plt.plot(concave[:,0],concave[:,1])
-# plt.show()
+plt.plot(concave1[:,0],concave1[:,1])
+plt.plot(concave2[:,0],concave2[:,1])
+plt.show()
+
+lense1_front = Surface(concave1, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.5)
+lense1_back = Surface(concave2, reflectivity=0.0, transmittance=1.0, n1=1.5, n2=1.0)
+
 
 ys = np.linspace(-1, 1, num)
 planewave = []
 for y in ys:
     planewave.append(
-        Wavelet(r=np.array([5.0, y]), k=np.array([-1.0, 0.0]), t0=0.0, wavelength=0.1, phase=0.0, pulsewidth=0.2,
-                spherical=False))
+        Wavelet(r=np.array([0.0, y]), k=np.array([-1.0, 0.0]), t0=0.0, wavelength=0.1, phase=0.0, pulsewidth=0.2,
+                spherical=True))
 
-mirror = Surface(concave, 1.0, 0.0, 1.0, 1.0)
-reflected = []
-
+onlense = []
 for i, wavelet in enumerate(planewave):
-    for k in range(20):
-        pos, k, t, hit = mirror.interact(wavelet)
+    for j in range(20):
+        pos, k, t, hit = lense1_front.interact(wavelet)
         if hit:
-            reflected.append(Wavelet(r=pos, k=k, t0=t, wavelength=0.1, phase=0.0, pulsewidth=0.2, spherical=False))
+            onlense.append(Wavelet(r=pos, k=k, t0=t, wavelength=wavelet.wavelength, phase=wavelet.phase, pulsewidth=wavelet.pulsewidth, spherical=True))
 
-print(len(reflected))
+print(len(onlense))
 
-x = np.linspace(3.0, 4.9, 150)
-y = np.linspace(-1.0, 1.0, 150)
+x = np.linspace(-0.1, 3, 150)
+y = np.linspace(-1.5, 1.5, 150)
 
-I_plane = calc_I(x, y, planewave, 1.0)
+I_plane = calc_I(x, y, onlense, 1.0)
+
+plt.plot(concave1[:,0],concave1[:,1])
+plt.plot(concave2[:,0],concave2[:,1])
+plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap=sns.diverging_palette(240, 10, as_cmap=True))
+plt.savefig("plane_field_ref.png", dpi=300)
+plt.show()
+
+plt.plot(concave1[:,0],concave1[:,1])
+plt.plot(concave2[:,0],concave2[:,1])
+plt.imshow(I_plane ** 2, extent=(x.min(), x.max(), y.max(), y.min()),
+           cmap=sns.cubehelix_palette(start=0, rot=0.4, gamma=1.0, hue=0.8, light=1.0, dark=0.1, as_cmap=True))
+# plt.imshow(I**2,extent=(x.min(), x.max(), y.max(), y.min()))
+plt.savefig("plane__int_ref.png", dpi=300)
+plt.show()
 
 x = np.linspace(-0.4, 3.0, 300)
 y = np.linspace(-0.9, 0.9, 150)
@@ -135,15 +151,7 @@ plt.imshow(I_ref ** 2, extent=(x.min(), x.max(), y.max(), y.min()),
 plt.savefig("intensity_ref.png", dpi=300)
 plt.show()
 
-plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap=sns.diverging_palette(240, 10, as_cmap=True))
-plt.savefig("plane_field_ref.png", dpi=300)
-plt.show()
 
-plt.imshow(I_plane ** 2, extent=(x.min(), x.max(), y.max(), y.min()),
-           cmap=sns.cubehelix_palette(start=0, rot=0.4, gamma=1.0, hue=0.8, light=1.0, dark=0.1, as_cmap=True))
-# plt.imshow(I**2,extent=(x.min(), x.max(), y.max(), y.min()))
-plt.savefig("plane__int_ref.png", dpi=300)
-plt.show()
 
 # for wavelet in reflected:
 #     plt.plot(wavelet.r[0],wavelet.r[1],"o")

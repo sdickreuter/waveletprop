@@ -102,8 +102,8 @@ concave2 = gen_concave_points(p0, r0, np.pi/3, num)
 # plt.plot(concave[:,0],concave[:,1])
 # plt.show()
 
-mirror1 = Surface(concave1, reflectivity=1.0, transmittance=0.0, n1=1.0, n2=1.0)
-mirror2 = Surface(concave2, reflectivity=1.0, transmittance=0.0, n1=1.0, n2=1.0)
+mirror1 = Surface(concave1, reflectivity=1.0, transmittance=0.0, n1=1.0, n2=1.5)
+mirror2 = Surface(concave2, reflectivity=1.0, transmittance=0.0, n1=1.5, n2=1.0)
 
 
 rays = []
