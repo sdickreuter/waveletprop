@@ -36,7 +36,7 @@ def angle_between(v1, v2):
 
 
 @jit()
-def rotate_vector(self, vector, theta):
+def rotate_vector(vector, theta):
     c, s = np.cos(theta), np.sin(theta)
     R = np.array([[c, -s], [s, c]])
     return np.dot(R, vector)
@@ -61,7 +61,7 @@ def gen_concave_points(p0, r, height, num):
     return points
 
 
-num = 512
+num = 128
 p0 = np.array([0.0, 0.0])
 concave1 = gen_concave_points(p0, -2.0, np.pi/3, num)
 concave1[:,1]=concave1[:,1]/concave1[:,1].max()
@@ -86,38 +86,40 @@ lense1_back = Surface(concave2, reflectivity=0.0, transmittance=1.0, n1=1.5, n2=
 # plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
 # plt.show()
 
-num = 1024
+num = 512
 
 rs = np.zeros((num,2))
-rs[:,0] = np.repeat(0.0,num)
-rs[:,1] = np.linspace(-1, 1, num)
-
 
 ks = np.zeros((num,2))
-ks[:,0] = np.repeat(1.0,num)
+ks[:,1] = np.repeat(-1.0,num)
+alphas = np.linspace(0,2*np.pi,num)
+for i in range(ks.shape[0]):
+    ks[i,:] = rotate_vector(ks[i,:],alphas[i])
 
 t0s = np.zeros((num))
+
 phases = np.zeros((num))
 
-planewave = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
 
-print("planewave: "+ str(planewave.n))
+pointsource = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
+
+print("planewave: "+ str(pointsource.n))
 
 x = np.linspace(0.1, 3, 400)
 y = np.linspace(-1.5, 1.5, 200)
 x2, y2 = np.meshgrid(x,y)
 points = np.vstack((x2.ravel(),y2.ravel())).T
 
-# I_plane = planewave.calc_field(points, 1.0)
-# I_plane = np.reshape(I_plane,x2.shape)
-#
-# plt.plot(concave1[:,0],concave1[:,1])
-# plt.plot(concave2[:,0],concave2[:,1])
-# plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap='RdBu')
-# plt.savefig("plane_field_ref.png", dpi=300)
-# plt.show()
+I_plane = pointsource.calc_field(points, 1.0, 1.0)
+I_plane = np.reshape(I_plane,x2.shape)
 
-onlense1 = lense1_front.interact_with_all_wavelets(planewave)
+plt.plot(concave1[:,0],concave1[:,1])
+plt.plot(concave2[:,0],concave2[:,1])
+plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap='RdBu')
+plt.savefig("plane_field_ref.png", dpi=300)
+plt.show()
+
+onlense1 = lense1_front.interact_with_all_wavelets(pointsource)
 
 print("onlense1: "+ str(onlense1.n))
 
@@ -143,12 +145,12 @@ plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap='RdBu')
 plt.savefig("plane_field_ref.png", dpi=300)
 plt.show()
 
-plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
-plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
-plt.imshow(I_plane ** 2, extent=(x.min(), x.max(), y.max(), y.min()), cmap='seismic')
-# plt.imshow(I**2,extent=(x.min(), x.max(), y.max(), y.min()))
-plt.savefig("plane__int_ref.png", dpi=300)
-plt.show()
+# plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
+# plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
+# plt.imshow(I_plane ** 2, extent=(x.min(), x.max(), y.max(), y.min()), cmap='seismic')
+# # plt.imshow(I**2,extent=(x.min(), x.max(), y.max(), y.min()))
+# plt.savefig("plane__int_ref.png", dpi=300)
+# plt.show()
 
 onlense2 = lense1_back.interact_with_all_wavelets(onlense1)
 print(onlense2.n)
@@ -167,12 +169,12 @@ plt.imshow(I_ref, extent=(x.min(), x.max(), y.max(), y.min()), cmap='RdBu')
 plt.savefig("field_ref.png", dpi=300)
 plt.show()
 
-plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
-plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
-plt.imshow(I_ref ** 2, extent=(x.min(), x.max(), y.max(), y.min()),cmap='seismic')
-# plt.imshow(I**2,extent=(x.min(), x.max(), y.max(), y.min()))
-plt.savefig("intensity_ref.png", dpi=300)
-plt.show()
+# plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
+# plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
+# plt.imshow(I_ref ** 2, extent=(x.min(), x.max(), y.max(), y.min()),cmap='seismic')
+# # plt.imshow(I**2,extent=(x.min(), x.max(), y.max(), y.min()))
+# plt.savefig("intensity_ref.png", dpi=300)
+# plt.show()
 
 
 
