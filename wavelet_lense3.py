@@ -7,14 +7,14 @@ mpl.use('TkAgg')
 
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import jit, jitclass, float64, int64, void, boolean
+from numba import jit, jitclass, float32, int32, void, boolean
 import cmath
 from wavelets2 import *
 
 
 
 
-num = 512
+num = 256
 
 concave1, concave2 = generate_lens_points(num,2.2)
 
@@ -22,14 +22,14 @@ concave1, concave2 = generate_lens_points(num,2.2)
 lense1_front = Surface(concave1, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.5)
 lense1_back = Surface(concave2, reflectivity=0.0, transmittance=1.0, n1=1.5, n2=1.0)
 
-num = 200
-ys = np.linspace(0,1,num)
-xs = np.repeat(2.5,num)
+num = 100
+ys = np.linspace(-1,1,num)
+xs = np.repeat(2.2,num)
 screen = Surface(np.vstack((xs,ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
 
-# plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
-# plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
-# plt.show()
+plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
+plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
+plt.show()
 
 num = 1000000
 
@@ -71,13 +71,31 @@ print("planewave: "+ str(planewave.n))
 
 #onlense1 = lense1_front.interact_with_all_wavelets(pointsource)
 onlense1 = lense1_front.interact_with_all_wavelets(planewave)
-onlense1.mode = modes['spherical']
+onlense1.mode = modes['gaussian']
 
 print("onlense1: "+ str(onlense1.n))
 
 onlense2 = lense1_back.interact_with_all_wavelets(onlense1)
 
 print("onlense2: "+ str(onlense2.n))
+
+#onlense2.mode = modes['gaussian']
+
+# x = np.linspace(1.3, 4, 200)
+# y = np.linspace(-1.0, 1.0, 100)
+# x2, y2 = np.meshgrid(x,y)
+# points = np.vstack((x2.ravel(),y2.ravel())).T
+#
+# I_plane = onlense2.calc_field(points, 1.0,lense1_back.n2)
+# I_plane = np.reshape(I_plane,x2.shape)
+#
+# plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
+# plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
+# plt.plot(onlense2.r[:,0],onlense2.r[:,1],'rx')
+# plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap='RdBu')
+# plt.savefig("plane_field_ref.png", dpi=300)
+# plt.show()
+
 
 positions, field = screen.intensity_on_surface(onlense2)
 
@@ -86,21 +104,16 @@ plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
 plt.plot(positions[:,0],positions[:,1])
 plt.show()
 
-#print(positions)
-#print(field)
 
-yind = positions[:,1]
-yind -= yind.min()
-yind /= yind.max()
-un = len(np.unique(yind))
-yind *= un-1
-yind = np.array(yind,dtype=np.int)
+screen_points = screen.points
+intensity = np.zeros(screen_points.shape[0]-1)
+hits = np.zeros(screen_points.shape[0]-1)
+for i in range(len(field)):
+    for j in range(len(intensity)):
+        if (positions[i,1] > screen_points[j,1]) and (positions[i,1] < screen_points[j+1,1]):
+            intensity[j] += field[i]
+            hits[j] += 1
 
-intensity = np.zeros(un)
-hits = np.zeros(un)
-for i in yind:
-    intensity[i] += field[i]
-    hits[i] += 1
 
 plt.plot(intensity)
 plt.show()

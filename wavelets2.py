@@ -60,9 +60,9 @@ class Wavelets(object):
         for j in range(points.shape[0]):
             for i in range(self.n):
                 r = np.linalg.norm(self.r[i,:] - points[j,:])
-                #field[j] += 1/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
-                theta = self.angle_between(np.subtract(points[j,:],self.r[i,:]),self.k[i,:]).real
-                field[j] += cmath.cos(theta).real/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 1j*2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
+                field[j] += 1/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
+                #theta = self.angle_between(np.subtract(points[j,:],self.r[i,:]),self.k[i,:]).real
+                #field[j] += cmath.cos(theta).real/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 1j*2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
         return field
 
     def field_at_r(self,index,t):
