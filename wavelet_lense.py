@@ -13,54 +13,6 @@ from wavelets2 import *
 
 
 
-@jit()
-def unit_vector(vector):
-    """ Returns the unit vector of the vector.  """
-    return vector / np.linalg.norm(vector)
-
-
-@jit()
-def angle_between(v1, v2):
-    """ Returns the angle in radians between vectors 'v1' and 'v2'::
-    """
-    v1_u = unit_vector(v1)
-    v2_u = unit_vector(v2)
-    # return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
-    v = np.dot(v1_u, v2_u)
-    if v > 1.0:
-        v = 1.0
-    elif v < -1.0:
-        v = -1.0
-    # return np.arccos(v)
-    return cmath.acos(v)
-
-
-@jit()
-def rotate_vector(self, vector, theta):
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array([[c, -s], [s, c]])
-    return np.dot(R, vector)
-
-
-@jit()
-def gen_rotation_matrix(theta):
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array([[c, -s], [s, c]])
-    return R
-
-
-@jit()
-def gen_concave_points(p0, r, height, num):
-    v = [r,0]
-    thetas = np.linspace(height / 2, -height / 2, num)
-    points = np.zeros((num, 2))
-    for i, theta in enumerate(thetas):
-        R = gen_rotation_matrix(theta)
-        buf = np.dot(R, v)
-        points[i] = p0 + buf
-    return points
-
-
 num = 512
 p0 = np.array([0.0, 0.0])
 concave1 = gen_concave_points(p0, -2.0, np.pi/3, num)

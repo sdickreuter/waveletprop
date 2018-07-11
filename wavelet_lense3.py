@@ -31,7 +31,7 @@ plt.plot(lense1_front.points[:,0],lense1_front.points[:,1])
 plt.plot(lense1_back.points[:,0],lense1_back.points[:,1])
 plt.show()
 
-num = 1000000
+num = 100000
 
 # rs = np.zeros((num,2))
 # ks = np.zeros((num,2))
@@ -71,7 +71,7 @@ print("planewave: "+ str(planewave.n))
 
 #onlense1 = lense1_front.interact_with_all_wavelets(pointsource)
 onlense1 = lense1_front.interact_with_all_wavelets(planewave)
-onlense1.mode = modes['gaussian']
+#onlense1.mode = modes['gaussian']
 
 print("onlense1: "+ str(onlense1.n))
 
@@ -79,7 +79,7 @@ onlense2 = lense1_back.interact_with_all_wavelets(onlense1)
 
 print("onlense2: "+ str(onlense2.n))
 
-#onlense2.mode = modes['gaussian']
+onlense2.mode = modes['spherical']
 
 # x = np.linspace(1.3, 4, 200)
 # y = np.linspace(-1.0, 1.0, 100)
@@ -105,18 +105,21 @@ plt.plot(positions[:,0],positions[:,1])
 plt.show()
 
 
-screen_points = screen.points
-intensity = np.zeros(screen_points.shape[0]-1)
-hits = np.zeros(screen_points.shape[0]-1)
-for i in range(len(field)):
-    for j in range(len(intensity)):
-        if (positions[i,1] > screen_points[j,1]) and (positions[i,1] < screen_points[j+1,1]):
-            intensity[j] += field[i]
-            hits[j] += 1
-
-
-plt.plot(intensity)
+I = onlense2.calc_field(screen.points, 1.0,lense1_back.n2)
+plt.plot(I**2)
 plt.show()
 
-plt.plot(hits)
-plt.show()
+# intensity = np.zeros(screen.points.shape[0]-1)
+# hits = np.zeros(screen.points.shape[0]-1)
+# for i in range(len(field)):
+#     for j in range(len(intensity)):
+#         if (positions[i,1] > screen.points[j,1]) and (positions[i,1] < screen.points[j+1,1]):
+#             intensity[j] += field[i]
+#             hits[j] += 1
+#
+#
+# plt.plot(intensity**2)
+# plt.show()
+#
+# plt.plot(hits)
+# plt.show()

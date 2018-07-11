@@ -60,9 +60,10 @@ class Wavelets(object):
         for j in range(points.shape[0]):
             for i in range(self.n):
                 r = np.linalg.norm(self.r[i,:] - points[j,:])
-                field[j] += 1/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
                 #theta = self.angle_between(np.subtract(points[j,:],self.r[i,:]),self.k[i,:]).real
                 #field[j] += cmath.cos(theta).real/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 1j*2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
+                field[j] += 1 / r * cmath.exp(1j * ( np.linalg.norm(self.k[i, :]) * r -
+                                                     1j * 2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
         return field
 
     def field_at_r(self,index,t):
@@ -81,12 +82,12 @@ class Wavelets(object):
         if self.mode == 1: # spherical
             phi2 = self.angle_between(v1, v2).real
             probability = np.abs((phi2) / (np.pi))
+
         elif self.mode == 2: # gaussian
             phi1 = self.angle_between(v1, self.k[index, :]).real
-            phi2 = self.angle_between(v1, v2).real
-            probability = 1 / (2 * np.pi) * (
-                np.sin(2 * phi1) + 2 * phi1 - np.sin(2 * (phi1 + phi2)) - 2 * (phi1 + phi2))
-            probability = np.abs(probability)
+            phi2 = self.angle_between(v2, self.k[index, :]).real
+            probability = 1 / 2 * ( np.sin(phi1) - np.sin(phi2))
+
         elif self.mode == 3: #ray
             #if (np.dot(np.cross(v1,self.k[index,:]),np.cross(v1,v2) >= 0)) and (np.dot(np.cross(v2,self.k[index,:]),np.cross(v2,v1) >= 0)):
             #if ( (v1[0]*self.k[index,0]-v1[1]*self.k[index,1]) * (v1[0]*v2[0]-v1[1]*v2[1])  ) >= 0 and\
@@ -96,6 +97,7 @@ class Wavelets(object):
                 probability = 1.0
             else:
                 probability = 0.0
+
         elif self.mode == 4:  # dipolar
             phi1 = self.angle_between(v1, self.k[index, :]).real
             phi2 = self.angle_between(v1, v2).real
@@ -197,6 +199,8 @@ spec_Surface = [
     ('transmittance', float64),
     ('n1', float64),
     ('n2', float64),
+    ('midpoints', float64[:, :]),
+    ('normals', float64[:, :]),
 ]
 
 @jitclass(spec_Surface)
@@ -207,6 +211,13 @@ class Surface(object):
         self.transmittance = transmittance
         self.n1 = n1
         self.n2 = n2
+        self.midpoints = np.zeros((self.points.shape[0]-1,2))
+        self.normals = np.zeros((self.points.shape[0] - 1,2))
+        for i in range(self.points.shape[0]-1):
+            self.midpoints[i] = 0.5 * np.add(self.points[i], self.points[i + 1])
+            normal = self.rotate_vector(np.subtract(self.points[i], self.points[i + 1]), np.pi / 2)
+            normal /= np.linalg.norm(normal)
+            self.normals[i] = normal
 
     # def angle_between(self, v1, v2):
     #     """ Returns the angle in radians between vectors 'v1' and 'v2'::
@@ -222,6 +233,11 @@ class Surface(object):
     #         v = -1.0
     #     # return np.arccos(v)
     #     return cmath.acos(v)
+
+    def flip_normals(self):
+        for i in range(self.normals.shape[0]):
+            self.normals[i] =  self.rotate_vector(self.normals[i], np.pi )
+
 
     def angle_between(self, v1, v2):
         """ Returns the angle in radians between vectors 'v1' and 'v2'::
@@ -242,7 +258,6 @@ class Surface(object):
         return reflected
 
     def transmitted_k(self, k, normal):
-        normal = self.rotate_vector(normal, np.pi )
         alpha =  self.angle_between(k, normal).real
         #beta = cmath.sqrt(self.n2 ** 2 - self.n1 ** 2 * cmath.sin(alpha) ** 2).real / self.n2
         #print((self.n1/self.n2) * np.sin(alpha))
@@ -288,10 +303,7 @@ class Surface(object):
             if np.random.rand() >= np.sum(probabilities):
                 probabilities /= np.sum(probabilities)
                 index = self.weightedChoice(probabilities)
-                position = 0.5 * np.add(self.points[index], self.points[index + 1])
-                normal = self.rotate_vector(np.subtract(self.points[index], self.points[index + 1]), np.pi / 2)
-                normal /= np.linalg.norm(normal)
-                return position, normal, True
+                return self.midpoints[index], self.normals[index], True
             else:
                 return np.array([0.0, 0.0]), np.array([0.0, 0.0]), False
         elif wavelets.mode == 3:
@@ -300,10 +312,7 @@ class Surface(object):
                 if probabilities[j] > 0.99:
                     index = j
             if index >= 0:
-                position = 0.5 * np.add(self.points[index], self.points[index + 1])
-                normal = self.rotate_vector(np.subtract(self.points[index,:], self.points[index + 1,:]), np.pi / 2)
-                normal /= np.linalg.norm(normal)
-                return position, normal, True
+                return self.midpoints[index], self.normals[index], True
             else:
                 return np.array([0.0, 0.0]), np.array([0.0, 0.0]), False
 
@@ -417,22 +426,37 @@ def gen_concave_points(p0, r, height, num):
 
 
 
-def generate_lens_points(num,height):
-    p0 = np.array([0.0, 0.0])
-    concave1 = gen_concave_points(p0, -2.0, np.pi / 3, num)
-    concave1[:, 1] = concave1[:, 1] / concave1[:, 1].max()
-    concave1[:, 1] = concave1[:, 1] * (height/2)
-    concave1[:, 0] -= concave1[:, 0].max()
-    #concave1[:, 0] += 1.0
 
-    p0 = np.array([0.0, 0.0])
-    concave2 = gen_concave_points(p0, 2.0, np.pi / 3, num)
-    concave2[:, 1] = concave2[:, 1] / concave2[:, 1].max()
-    concave2[:, 1] = concave2[:, 1] * (height/2)
-    concave2[:, 0] -= concave2[:, 0].min()
-    #concave2[:, 0] += concave1[:, 0].max()
 
-    concave1[:, 0] += 1.0
-    concave2[:, 0] += 1.0
+class Lense(object):
 
-    return concave1, concave2
+    def __init__(self, x, y, height, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
+        concave1, concave2 = self._generate_lens_points(num, height)
+        concave1[:, 0] += x
+        concave2[:, 0] += x
+        concave1[:, 1] += y
+        concave2[:, 1] += y
+        self.front = Surface(concave1, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
+        self.back = Surface(concave2, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
+        self.front.flip_normals()
+
+    def _generate_lens_points(self, num, height):
+        p0 = np.array([0.0, 0.0])
+        concave1 = gen_concave_points(p0, -2.0, np.pi / 3, num)
+        concave1[:, 1] = concave1[:, 1] / concave1[:, 1].max()
+        concave1[:, 1] = concave1[:, 1] * (height / 2)
+        concave1[:, 0] -= concave1[:, 0].max()
+
+        p0 = np.array([0.0, 0.0])
+        concave2 = gen_concave_points(p0, 2.0, np.pi / 3, num)
+        concave2[:, 1] = concave2[:, 1] / concave2[:, 1].max()
+        concave2[:, 1] = concave2[:, 1] * (height / 2)
+        concave2[:, 0] -= concave2[:, 0].min()
+
+        return concave1, concave2
+
+    def shift(self, dx, dy):
+        self.front.points[:, 0] += dx
+        self.back.points[:, 0] += dx
+        self.front.points[:, 1] += dy
+        self.back.points[:, 1] += dy
