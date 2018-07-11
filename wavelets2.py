@@ -56,15 +56,15 @@ class Wavelets(object):
 
     def calc_field(self, points, t, n=1.0):
         f = (c/n) / self.wavelength
-        field = np.zeros(points.shape[0])
+        field = np.zeros(points.shape[0],dtype=np.complex128)
         for j in range(points.shape[0]):
             for i in range(self.n):
                 r = np.linalg.norm(self.r[i,:] - points[j,:])
                 #theta = self.angle_between(np.subtract(points[j,:],self.r[i,:]),self.k[i,:]).real
                 #field[j] += cmath.cos(theta).real/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 1j*2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
-                field[j] += 1 / r * cmath.exp(1j * ( np.linalg.norm(self.k[i, :]) * r -
-                                                     1j * 2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
-        return field
+                field[j] += 1 / r * cmath.exp(1j * ( ( np.linalg.norm(self.k[i, :]) * r
+                                                     - 2 * cmath.pi * ((c/n)/self.wavelength) * (t - self.t0[i]) + self.phases[i])))
+        return np.real(field)
 
     def field_at_r(self,index,t):
         n = 1.0
@@ -85,8 +85,16 @@ class Wavelets(object):
 
         elif self.mode == 2: # gaussian
             phi1 = self.angle_between(v1, self.k[index, :]).real
+            #phi2 = self.angle_between(v1, v2).real
             phi2 = self.angle_between(v2, self.k[index, :]).real
-            probability = 1 / 2 * ( np.sin(phi1) - np.sin(phi2))
+            if phi2 > phi1:
+                probability = 1 / (4 * np.pi) * (
+                            np.sin(2 * phi1 + np.pi) - 2 * phi1 - np.sin(2 * phi2 + np.pi) + 2 * phi2)
+            else:
+                probability = 1 / (4 * np.pi) * (
+                            np.sin(2 * phi2 + np.pi) - 2 * phi2 - np.sin(2 * phi1 + np.pi) + 2 * phi1)
+
+            #probability = 1 / (4 * np.pi) * (np.sin(2 * phi1 + np.pi) - 2 * phi1 - np.sin(2 * phi2 + np.pi) + 2 * phi2)
 
         elif self.mode == 3: #ray
             #if (np.dot(np.cross(v1,self.k[index,:]),np.cross(v1,v2) >= 0)) and (np.dot(np.cross(v2,self.k[index,:]),np.cross(v2,v1) >= 0)):
@@ -158,39 +166,12 @@ class Wavelets(object):
             return v[0] * w[1] - v[1] * w[0]
         return (determinant(k,v1)>0) ^ (determinant(k,v2)>0)
 
-
-# def angle_between_clockwise(v1, v2):
-#     """ Returns the angle in radians between vectors 'v1' and 'v2'::
-#     """
-#     def determinant(v, w):
-#         return v[0] * w[1] - v[1] * w[0]
-#     v1_u = v1 / np.linalg.norm(v1)
-#     v2_u = v2 / np.linalg.norm(v2)
-#     v = np.dot(v1_u, v2_u)
-#     if determinant(v1,v2) > 0:
-#         return cmath.acos(v)
-#     else:
-#         return 2*np.pi-cmath.acos(v)
-#
-# r = np.array([0,0])
-# k = np.array([1,0])
-# point1 = np.array([1,0.1])
-# point2 = np.array([1,-0.1])
-# v1 = np.subtract(point1,r)
-# v2 = np.subtract(point2,r)
-# phi1 = angle_between_clockwise(v1,k).real
-# phi2 = angle_between_clockwise(v1,v2).real
-# phi3 = angle_between_clockwise(v2,k).real
-# phi1
-# phi2
-# phi3
-# phi1-phi3
-#
-#
-# def is_between(k, v1, v2):
-#     def determinant(v, w):
-#         return v[0] * w[1] - v[1] * w[0]
-#     return (determinant(k, v1) > 0) ^ (determinant(k, v2) > 0)
+    def append_wavelets(self, wavelets):
+        self.r = np.concatenate((self.r, wavelets.r))
+        self.k = np.concatenate((self.k, wavelets.k))
+        self.n += wavelets.n
+        self.t0 = np.concatenate((self.t0, wavelets.t0))
+        self.phases = np.concatenate((self.phases, wavelets.phases))
 
 
 spec_Surface = [
@@ -219,28 +200,14 @@ class Surface(object):
             normal /= np.linalg.norm(normal)
             self.normals[i] = normal
 
-    # def angle_between(self, v1, v2):
-    #     """ Returns the angle in radians between vectors 'v1' and 'v2'::
-    #     """
-    #     # v1_u = self.unit_vector(v1)
-    #     # v2_u = self.unit_vector(v2)
-    #     v1_u = v1 / np.linalg.norm(v1)
-    #     v2_u = v2 / np.linalg.norm(v2)
-    #     v = np.dot(v1_u, v2_u)
-    #     if v > 1.0:
-    #         v = 1.0
-    #     elif v < -1.0:
-    #         v = -1.0
-    #     # return np.arccos(v)
-    #     return cmath.acos(v)
-
     def flip_normals(self):
         for i in range(self.normals.shape[0]):
             self.normals[i] =  self.rotate_vector(self.normals[i], np.pi )
 
 
     def angle_between(self, v1, v2):
-        """ Returns the angle in radians between vectors 'v1' and 'v2'::
+        """
+        Returns the angle in radians between vectors 'v1' and 'v2'::
         """
         def determinant(v, w):
             return v[0] * w[1] - v[1] * w[0]
@@ -286,7 +253,8 @@ class Surface(object):
     #     return probabilities, fields
 
     def weightedChoice(self, weights):
-        """Return a random item from objects, with the weighting defined by weights
+        """
+        Return a random item from objects, with the weighting defined by weights
         (which must sum to 1).
         From: http://stackoverflow.com/a/10803136
         """
@@ -309,6 +277,8 @@ class Surface(object):
         elif wavelets.mode == 3:
             index = -1
             for j in range(len(probabilities)):
+
+
                 if probabilities[j] > 0.99:
                     index = j
             if index >= 0:
@@ -336,25 +306,41 @@ class Surface(object):
 
         return np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0.0, False
 
-    def intensity_on_surface(self,wavelets):
-        hits = np.zeros(wavelets.n, dtype=np.float64)
-        rs = np.zeros((wavelets.n, 2), dtype=np.float64)
-        ints = np.zeros(wavelets.n, dtype=np.float64)
+    # def intensity_on_surface(self,wavelets):
+    #     hits = np.zeros(wavelets.n, dtype=np.float64)
+    #     rs = np.zeros((wavelets.n, 2), dtype=np.float64)
+    #     ints = np.zeros(wavelets.n, dtype=np.float64)
+    #
+    #     r = np.zeros(2)
+    #     k = np.zeros(2)
+    #     t = 0.0
+    #     hit = False
+    #
+    #     for i in range(wavelets.n):
+    #         #r, normal, hit = self.localize_wavelet(wavelets, i)
+    #         rs[i] = r
+    #         hits[i] = hit
+    #         ints[i] = wavelets.field_at_r(i,1.0)
+    #
+    #     indices = (hits > 0)
+    #
+    #     return rs[indices,:], ints[indices]
 
-        r = np.zeros(2)
-        k = np.zeros(2)
-        t = 0.0
-        hit = False
+    def intensity_on_surface(self,wavelets):
+        rs = wavelets.r
+        field = np.zeros(wavelets.n, dtype=np.float64)
 
         for i in range(wavelets.n):
-            r, normal, hit = self.localize_wavelet(wavelets, i)
-            rs[i] = r
-            hits[i] = hit
-            ints[i] = wavelets.field_at_r(i,1.0)
+            field[i] = wavelets.field_at_r(i,1.0)
 
-        indices = (hits > 0)
+        sumfield = np.zeros(self.points.shape[0] - 1)
+        for i in range(len(field)):
+            for j in range(len(sumfield)):
+                if (rs[i, 1] > self.points[j, 1]) and (rs[i, 1] < self.points[j + 1, 1]):
+                    sumfield[j] += field[i]
 
-        return rs[indices,:], ints[indices]
+
+        return self.points, sumfield
 
 
     def interact_with_all_wavelets(self, wavelets):
@@ -431,13 +417,15 @@ def gen_concave_points(p0, r, height, num):
 class Lense(object):
 
     def __init__(self, x, y, height, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
+        self.n1 = n1
+        self.n2 = n2
         concave1, concave2 = self._generate_lens_points(num, height)
         concave1[:, 0] += x
         concave2[:, 0] += x
         concave1[:, 1] += y
         concave2[:, 1] += y
         self.front = Surface(concave1, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
-        self.back = Surface(concave2, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
+        self.back = Surface(concave2, reflectivity=reflectivity, transmittance=transmittance, n1=n2, n2=n1)
         self.front.flip_normals()
 
     def _generate_lens_points(self, num, height):

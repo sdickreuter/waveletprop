@@ -41,22 +41,7 @@ phases = np.zeros((num))
 pointsource = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
 print("pointsource: "+ str(pointsource.n))
 
-# x = np.linspace(0.1, 3, 400)
-# y = np.linspace(-1.5, 1.5, 200)
-# x2, y2 = np.meshgrid(x,y)
-# points = np.vstack((x2.ravel(),y2.ravel())).T
-#
-# I_plane = pointsource.calc_field(points, 1.0, 1.0)
-# I_plane = np.reshape(I_plane,x2.shape)
-#
-# plt.plot(concave1[:,0],concave1[:,1])
-# plt.plot(concave2[:,0],concave2[:,1])
-# plt.imshow(I_plane, extent=(x.min(), x.max(), y.max(), y.min()), cmap='RdBu')
-# plt.savefig("plane_field_ref.png", dpi=300)
-# plt.show()
 
-
-#onlense1 = lense1_front.interact_with_all_wavelets(pointsource)
 onlense1 = lense1.front.interact_with_all_wavelets(pointsource)
 #onlense1.mode = modes['gaussian']
 
