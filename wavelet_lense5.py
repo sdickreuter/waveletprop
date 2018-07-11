@@ -14,7 +14,7 @@ from wavelets2 import *
 
 
 
-num = 320
+num = 1024
 
 lense1 = Lense(x=0.6,y=0,height=2.0,num=num)
 
@@ -37,12 +37,13 @@ ks = np.zeros((num,2))
 ks[:,0] = np.repeat(1.0,num)
 t0s = np.zeros((num))
 phases = np.zeros((num))
-planewave = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['gaussian'])
+planewave = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
 print("planewave: "+ str(planewave.n))
 
 
 
 onlense1 = lense1.front.interact_with_all_wavelets(planewave)
+onlense1.mode = modes['gaussian']
 print("onlense1: "+ str(onlense1.n))
 onlense2 = lense1.back.interact_with_all_wavelets(onlense1)
 print("onlense2: "+ str(onlense2.n))
@@ -74,6 +75,7 @@ plt.show()
 
 for i in range(50):
 
+    onlense1.mode = modes['gaussian']
     onlense1.append_wavelets(lense1.front.interact_with_all_wavelets(planewave))
     #print("onlense1: "+ str(onlense1.n))
     onlense2.append_wavelets(lense1.back.interact_with_all_wavelets(onlense1))
