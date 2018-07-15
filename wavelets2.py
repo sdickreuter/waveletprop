@@ -181,7 +181,9 @@ spec_Surface = [
     ('n1', float64),
     ('n2', float64),
     ('midpoints', float64[:, :]),
+    ('field', float64[:]),
     ('normals', float64[:, :]),
+    ('count', int64),
 ]
 
 @jitclass(spec_Surface)
@@ -199,6 +201,10 @@ class Surface(object):
             normal = self.rotate_vector(np.subtract(self.points[i], self.points[i + 1]), np.pi / 2)
             normal /= np.linalg.norm(normal)
             self.normals[i] = normal
+
+        self.field = np.zeros(self.midpoints.shape[0])
+        self.count = 0
+
 
     def flip_normals(self):
         for i in range(self.normals.shape[0]):
@@ -326,21 +332,18 @@ class Surface(object):
     #
     #     return rs[indices,:], ints[indices]
 
-    def intensity_on_surface(self,wavelets):
-        rs = wavelets.r
+    def add_field_from_wavelets(self,wavelets):
         field = np.zeros(wavelets.n, dtype=np.float64)
-
+        self.count += wavelets.n
         for i in range(wavelets.n):
             field[i] = wavelets.field_at_r(i,1.0)
 
-        sumfield = np.zeros(self.points.shape[0] - 1)
         for i in range(len(field)):
-            for j in range(len(sumfield)):
-                if (rs[i, 1] > self.points[j, 1]) and (rs[i, 1] < self.points[j + 1, 1]):
-                    sumfield[j] += field[i]
-
-
-        return self.points, sumfield
+            for j in range(self.field.shape[0]):
+                if ((wavelets.r[i, 1] > self.points[j, 1]) and (wavelets.r[i, 1] < self.points[j + 1, 1])) \
+                            or ((wavelets.r[i, 0] > self.points[j, 0]) and (wavelets.r[i, 0] < self.points[j + 1, 0])):
+                    self.field[j] += field[i]*np.dot(self.rotate_vector(wavelets.k[i,:],np.pi/2),np.subtract(self.points[j+1,:],self.points[j,:]))
+                    #self.field[j] += field[i]*np.dot(wavelets.k[i,:],self.normals[j,:])
 
 
     def interact_with_all_wavelets(self, wavelets):
