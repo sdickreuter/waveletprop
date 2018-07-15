@@ -69,8 +69,8 @@ class Wavelets(object):
     def field_at_r(self,index,t):
         n = 1.0
         f = (c/n) / self.wavelength
-        field = cmath.exp( - 1j*2 * cmath.pi * f * (t - self.t0[index]) + self.phases[index]).real
-        return field
+        field = cmath.exp( 1j * ( np.dot(self.k[index, :],self.r[index,:]) - 2 * cmath.pi * f * (t - self.t0[index]) + self.phases[index]))
+        return np.real(field)
 
 
     def calc_probability_of_wavelet(self,index, point1, point2):
@@ -182,6 +182,7 @@ spec_Surface = [
     ('n2', float64),
     ('midpoints', float64[:, :]),
     ('field', float64[:]),
+    ('hits', int64[:]),
     ('normals', float64[:, :]),
     ('count', int64),
 ]
@@ -203,7 +204,9 @@ class Surface(object):
             self.normals[i] = normal
 
         self.field = np.zeros(self.midpoints.shape[0])
+        self.hits = np.zeros(self.midpoints.shape[0],dtype=np.int64)
         self.count = 0
+
 
 
     def flip_normals(self):
@@ -344,7 +347,7 @@ class Surface(object):
                             or ((wavelets.r[i, 0] > self.points[j, 0]) and (wavelets.r[i, 0] < self.points[j + 1, 0])):
                     self.field[j] += field[i]*np.dot(self.rotate_vector(wavelets.k[i,:],np.pi/2),np.subtract(self.points[j+1,:],self.points[j,:]))
                     #self.field[j] += field[i]*np.dot(wavelets.k[i,:],self.normals[j,:])
-
+                    self.hits[j] += 1
 
     def interact_with_all_wavelets(self, wavelets):
         hits = np.zeros(wavelets.n, dtype=np.float64)

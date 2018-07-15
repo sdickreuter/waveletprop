@@ -18,6 +18,7 @@ def make_planewave(num):
     rs = np.zeros((num, 2))
     rs[:, 0] = np.repeat(0.0, num)
 
+    #rs[:, 1] = np.random.normal(0,0.5,num)
     #rs[:, 1] = np.random.rand(num)
     rs[:, 1] = np.linspace(0,1, num)
     rs[:, 1] *= 2
@@ -30,19 +31,19 @@ def make_planewave(num):
     return Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
 
 
-plotit = True
+plotit = False
 
 num = 100
 
 lense1 = Lense(x=0.5, y=0, height=2.0, num=num)
 
-num = 100
-ys = np.linspace(-1, 1, num)
+num = 201
+ys = np.linspace(-0.5, 0.5, num)
 xs = np.repeat(2.65, num)
 screen = Surface(np.vstack((xs, ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
 screen.flip_normals()
 
-num = 100
+num = 201
 xs = np.linspace(1.0, 3, num)
 ys = np.repeat(0, num)
 screen2 = Surface(np.vstack((xs, ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
@@ -56,7 +57,7 @@ plt.plot(screen.points[:, 0], screen.points[:, 1])
 plt.plot(screen2.points[:, 0], screen2.points[:, 1])
 plt.show()
 
-num = 100
+num = 300
 
 planewave = make_planewave(num)
 print("planewave: " + str(planewave.n))
@@ -157,6 +158,6 @@ plt.plot(screen.midpoints[:,1],screen.field ** 2)
 plt.savefig("wavelet_lense5_screeny.png", dpi=600)
 plt.show()
 
-plt.plot(screen2.midpoints[:,0],screen2.field ** 2)
+plt.plot(screen2.midpoints[:,0],screen2.hits)
 plt.savefig("wavelet_lense_screenx.png", dpi=600)
 plt.show()
