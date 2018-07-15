@@ -52,7 +52,7 @@ ks[:,0] = np.repeat(1.0,num)
 t0s = np.zeros((num))
 phases = np.zeros((num))
 planewave = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
-print("planewave: "+ str(planewave.n))
+print("pointsource: "+ str(planewave.n))
 
 
 # x = np.linspace(0.1, 3, 400)

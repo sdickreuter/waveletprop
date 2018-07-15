@@ -207,6 +207,9 @@ class Surface(object):
         self.hits = np.zeros(self.midpoints.shape[0],dtype=np.int64)
         self.count = 0
 
+    def _update_midpoints(self):
+        for i in range(self.points.shape[0]-1):
+            self.midpoints[i] = 0.5 * np.add(self.points[i], self.points[i + 1])
 
 
     def flip_normals(self):
@@ -422,9 +425,12 @@ def gen_concave_points(p0, r, height, num):
 
 class Lense(object):
 
-    def __init__(self, x, y, height, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
+    def __init__(self, x, y, height, r=2.0, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
         self.n1 = n1
         self.n2 = n2
+        self.r = r
+        self.x = x
+        self.y = y
         concave1, concave2 = self._generate_lens_points(num, height)
         concave1[:, 0] += x
         concave2[:, 0] += x
@@ -433,24 +439,35 @@ class Lense(object):
         self.front = Surface(concave1, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
         self.back = Surface(concave2, reflectivity=reflectivity, transmittance=transmittance, n1=n2, n2=n1)
         self.front.flip_normals()
+        self.d = self.back.points[:, 0].max() - self.front.points[:, 0].min()
+        self.f = self._calc_f()
 
     def _generate_lens_points(self, num, height):
         p0 = np.array([0.0, 0.0])
-        concave1 = gen_concave_points(p0, -2.0, np.pi / 3, num)
+        concave1 = gen_concave_points(p0, -self.r, np.pi / 3, num)
         concave1[:, 1] = concave1[:, 1] / concave1[:, 1].max()
         concave1[:, 1] = concave1[:, 1] * (height / 2)
         concave1[:, 0] -= concave1[:, 0].max()
 
         p0 = np.array([0.0, 0.0])
-        concave2 = gen_concave_points(p0, 2.0, np.pi / 3, num)
+        concave2 = gen_concave_points(p0, self.r, np.pi / 3, num)
         concave2[:, 1] = concave2[:, 1] / concave2[:, 1].max()
         concave2[:, 1] = concave2[:, 1] * (height / 2)
         concave2[:, 0] -= concave2[:, 0].min()
 
         return concave1, concave2
 
-    def shift(self, dx, dy):
+    def _calc_f(self):
+        return 1/ ( (self.n2-self.n1)/self.n1 * ( 2 / self.r) + ((self.n2-self.n1)**2*self.d)/(self.n2*self.n1*2*self.r) )
+
+
+    def shift(self, dx = 0, dy = 0):
+        self.x += dx
+        self.y += dy
         self.front.points[:, 0] += dx
         self.back.points[:, 0] += dx
         self.front.points[:, 1] += dy
         self.back.points[:, 1] += dy
+        self.front._update_midpoints()
+        self.back._update_midpoints()
+

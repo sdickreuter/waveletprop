@@ -53,14 +53,14 @@ phases = np.zeros((num))
 
 planewave = Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
 
-print("planewave: "+ str(planewave.n))
+print("pointsource: "+ str(planewave.n))
 
 x = np.linspace(0.1, 3, 400)
 y = np.linspace(-1.5, 1.5, 200)
 x2, y2 = np.meshgrid(x,y)
 points = np.vstack((x2.ravel(),y2.ravel())).T
 
-# I_plane = planewave.calc_field(points, 1.0)
+# I_plane = pointsource.calc_field(points, 1.0)
 # I_plane = np.reshape(I_plane,x2.shape)
 #
 # plt.plot(concave1[:,0],concave1[:,1])
@@ -76,9 +76,9 @@ print("onlense1: "+ str(onlense1.n))
 
 # plt.plot(concave1[:,0],concave1[:,1])
 # plt.plot(concave2[:,0],concave2[:,1])
-# for i in range(planewave.n):
-#     plt.plot(planewave.r[i,0], planewave.r[i,1], "bo")
-#     plt.arrow(planewave.r[i,0], planewave.r[i,1], planewave.k[i,0], planewave.k[i,1])
+# for i in range(pointsource.n):
+#     plt.plot(pointsource.r[i,0], pointsource.r[i,1], "bo")
+#     plt.arrow(pointsource.r[i,0], pointsource.r[i,1], pointsource.k[i,0], pointsource.k[i,1])
 # for i in range(onlense1.n):
 #     plt.plot(onlense1.r[i,0], onlense1.r[i,1], "rx")
 #     plt.arrow(onlense1.r[i,0], onlense1.r[i,1], onlense1.k[i,0], onlense1.k[i,1])
