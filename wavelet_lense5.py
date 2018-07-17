@@ -35,13 +35,18 @@ plotit = False
 
 num = 301
 
-lense1 = Lense(x=0.5, y=0, height=2.0, num=num)
+#lense1 = Lense(x=0.5, y=0, height=2.0, num=num)
+#lense1 = Lense(x=0.0, y=0,r1=-1.0,r2=np.inf,height=0.5, num=num)
+lense1 = Lense(x=0.0, y=0,r1=-1.0,r2=1.0,height=0.5, num=num)
+lense1.shift(dx=lense1._calc_f_front()+lense1.front.points[:,0].min())
+
 print(lense1.f)
 
 num = 301
 ys = np.linspace(-0.3, 0.3, num)
-xs = np.repeat(lense1.x+lense1.f+lense1.d, num)
-#xs = np.repeat(lense1.x+lense1.f, num)
+#xs = np.repeat(lense1.x+lense1.f+lense1.d, num)
+#xs = np.repeat(3.63, num)
+xs = np.repeat(1.95, num)
 screen = Surface(np.vstack((xs, ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
 screen.flip_normals()
 
@@ -59,7 +64,7 @@ plt.plot(screen.points[:, 0], screen.points[:, 1])
 plt.plot(screen2.points[:, 0], screen2.points[:, 1])
 plt.show()
 
-num = 1000
+num = 200
 
 planewave = make_planewave(num)
 print("pointsource: " + str(planewave.n))
@@ -88,7 +93,7 @@ if plotit:
     plt.show()
 
 
-    divider = 300
+    divider = 30
     #plt.plot(lense1.front.points[:, 0], pointsource.r[:, 1])
     for i in range(planewave.n):
         plt.plot(planewave.r[i,0], planewave.r[i,1], "bo")
@@ -96,7 +101,7 @@ if plotit:
     plt.plot(lense1.front.points[:, 0], lense1.front.points[:, 1])
     for i in range(onlense_front.n):
         plt.plot(onlense_front.r[i,0], onlense_front.r[i,1], "bo")
-        plt.arrow(onlense_front.r[i,0], onlense_front.r[i,1], onlense_front.k[i,0]/divider, onlense_front.k[i,1]/divider)
+        plt.arrow(onlense_front.r[i,0], onlense_front.r[i,1], onlense_front.k[i,0]/(divider*20), onlense_front.k[i,1]/(divider*20))
     plt.plot(lense1.back.points[:, 0], lense1.back.points[:, 1])
     for i in range(onlense_back.n):
         plt.plot(onlense_back.r[i, 0], onlense_back.r[i, 1], "bo")

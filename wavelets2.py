@@ -429,8 +429,11 @@ def gen_rotation_matrix(theta):
 
 @jit()
 def gen_concave_points(p0, r, height, num):
+    if height > np.abs(r):
+        height = np.abs(r)
     v = [r,0]
-    thetas = np.linspace(height / 2, -height / 2, num)
+    theta_max = np.arcsin(height/r)
+    thetas = np.linspace(theta_max, -theta_max, num)
     points = np.zeros((num, 2))
     for i, theta in enumerate(thetas):
         R = gen_rotation_matrix(theta)
@@ -441,47 +444,81 @@ def gen_concave_points(p0, r, height, num):
 
 
 
-
 class Lense(object):
 
-    def __init__(self, x, y, r=2.0, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
+    def __init__(self, x, y, r1, r2, height,reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
         self.n1 = n1
         self.n2 = n2
-        self.r = r
+        self.r1 = r1
+        self.r2 = r2
         self.x = x
         self.y = y
-        concave1, concave2 = self._generate_lens_points(num)
-        concave1[:, 0] += x
-        concave2[:, 0] += x
-        concave1[:, 1] += y
-        concave2[:, 1] += y
-        self.front = Surface(concave1, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
-        self.back = Surface(concave2, reflectivity=reflectivity, transmittance=transmittance, n1=n2, n2=n1)
-        self.front.flip_normals()
+        self.height = height
+
+
+        points1 = self._generate_lens_points(self.r1,self.height,num)
+        # points1[:, 0] += x
+        # points1[:, 0] += x
+        # points1[:, 1] += y
+        # points1[:, 1] += y
+
+        points2 = self._generate_lens_points(self.r2,self.height,num)
+        # points2[:, 0] += x
+        # points2[:, 0] += x
+        # points2[:, 1] += y
+        # points2[:, 1] += y
+
+        self.front = Surface(points1, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
+        self.back = Surface(points2, reflectivity=reflectivity, transmittance=transmittance, n1=n2, n2=n1)
+
+        self.front.points[:,0] -= self.height/5
+        self.back.points[:, 0] += self.height / 5
+
+        self.front.points[:,0] += x
+        self.back.points[:, 0] += x
+        self.front.points[:,1] += y
+        self.back.points[:, 1] += y
+
+        self.front._update_midpoints()
+        self.back._update_midpoints()
+
+        #self.front.flip_normals()
         self.d = self.back.points[:, 0].max() - self.front.points[:, 0].min()
+
+
         self.f = self._calc_f()
         print('d: '+str(self.d))
         print('f: ' + str(self.f))
 
-    def _generate_lens_points(self, num):
-        p0 = np.array([0.0, 0.0])
-        concave1 = gen_concave_points(p0, -self.r, np.pi , num)
-        #concave1[:, 1] = concave1[:, 1] / concave1[:, 1].max()
-        #concave1[:, 1] = concave1[:, 1] * (height / 2)
-        concave1[:, 0] -= concave1[:, 0].max()
-        concave1[:, 0] -=  (concave1[:, 0].max()-concave1[:, 0].min())/4
+    def _generate_lens_points(self,r,height, num):
 
-        p0 = np.array([0.0, 0.0])
-        concave2 = gen_concave_points(p0, self.r, np.pi , num)
-        #concave2[:, 1] = concave2[:, 1] / concave2[:, 1].max()
-        #concave2[:, 1] = concave2[:, 1] * (height / 2)
-        concave2[:, 0] -= concave2[:, 0].min()
-        concave2[:, 0] +=  (concave2[:, 0].max()-concave2[:, 0].min())/4
+        if (r is not np.inf) and (r is not -np.inf):
+            p0 = np.array([0.0, 0.0])
+            points1 = gen_concave_points(p0, r, height, num)
+            if r > 0:
+                points1[:, 0] -= points1[:, 0].min()
+            else:
+                points1[:, 0] -= points1[:, 0].max()
+        else:
+            points1 = np.zeros((num, 2))
+            #points1[:, 0] = self.x
+            points1[:, 1] = np.linspace(self.height, -self.height, num)
 
-        return concave1, concave2
+        #points1[:, 0] -= (points1[:, 0].max() - points1[:, 0].min()) / 10
+
+        return points1
 
     def _calc_f(self):
-        return 1/ ( (self.n2-self.n1)/self.n1 * ( 2 / self.r) + ((self.n2-self.n1)**2*self.d)/(self.n2*self.n1*2*self.r) )
+        return np.abs(1/ ( (self.n2-self.n1)/self.n1 * ( 1 / self.r1 - 1/ self.r2) + ((self.n2-self.n1)**2*self.d)/(self.n2*self.n1*self.r1*self.r2) ))
+
+    def _calc_f_front(self):
+        h1 = -(self.f*(self.n2-1)*self.d)/( self.r2*self.n2)
+        return np.abs((self.f-h1)) #+ (-self.front.points[:,0].min()+self.x))
+
+    def _calc_f_back(self):
+        f = self._calc_f()
+        h2 = -(self.f*(self.n2-1)*self.d)/( self.r1*self.n2)
+        return np.abs((self.f-h2)) #+ (self.back.points[:,0].max()-self.x))
 
 
     def shift(self, dx = 0, dy = 0):
@@ -494,66 +531,3 @@ class Lense(object):
         self.front._update_midpoints()
         self.back._update_midpoints()
 
-    def flip(self):
-        alpha = np.pi
-        for i in range(self.front.points.shape[0]):
-            self.front.points[i,0] = self.front.points[i,0] - self.x
-            self.front.points[i, 1] = self.front.points[i, 1] - self.y
-            self.front.points[i, :] = rotate_vector(self.front.points[i, :],alpha)
-            self.front.points[i, 0] = self.front.points[i, 0] + self.x
-            self.front.points[i, 1] = self.front.points[i, 1] + self.y
-        for i in range(self.front.points.shape[0]):
-            self.back.points[i,0] = self.back.points[i,0] - self.x
-            self.back.points[i, 1] = self.back.points[i, 1] - self.y
-            self.back.points[i, :] = rotate_vector(self.back.points[i, :],alpha)
-            self.back.points[i, 0] = self.back.points[i, 0] + self.x
-            self.back.points[i, 1] = self.back.points[i, 1] + self.y
-        self.front._update_midpoints()
-        self.back._update_midpoints()
-        self.front._update_normals()
-        self.back._update_normals()
-
-        buf = self.front
-        self.front = self.back
-        self.back = buf
-
-        self.front.n1 = self.n1
-        self.front.n2 = self.n2
-        self.back.n1 = self.n2
-        self.back.n2 = self.n1
-
-
-class PlanConvex(Lense):
-
-    def __init__(self, x, y, r=2.0, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
-        self.n1 = n1
-        self.n2 = n2
-        self.r = r
-        self.x = x
-        self.y = y
-        concave1, concave2 = self._generate_lens_points(num)
-        concave1[:, 0] += x
-        concave1[:, 1] += y
-        self.front = Surface(concave1, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
-        line = np.zeros(concave1.shape)
-        line[:, 0] = self.x
-        line[:, 1] = np.linspace(concave1[:,1].min(),concave1[:,1].max(),num)
-        self.back = Surface(line, reflectivity=reflectivity, transmittance=transmittance, n1=n2, n2=n1)
-
-        self.front.flip_normals()
-        self.back.flip_normals()
-
-        self.d = self.back.points[:, 0].max() - self.front.points[:, 0].min()
-        self.f = self._calc_f()
-        print('d: '+str(self.d))
-        print('f: ' + str(self.f))
-
-    def _calc_f_front(self):
-        f = self._calc_f()
-        h1 = -(f*(self.n2-1)*self.d)/( self.r*self.n2)
-        return self.front
-
-    def _calc_f_back(self):
-        f = self._calc_f()
-        h1 = -(f*(self.n2-1)*self.d)/( self.r*self.n2)
-        return self.front
