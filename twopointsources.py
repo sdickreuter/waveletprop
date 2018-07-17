@@ -29,18 +29,8 @@ def make_pointsource(num):
 plotit = True
 
 num = 301
-
-lense1 = Lense(x=0.0, y=0, height=2.0, num=num)
-lense2 = Lense(x=0.0, y=0, height=2.0, num=num)
-
-lense1.shift(dx=lense1.f)
-lense2.shift(dx=lense1.x+lense2.f)
-
-
-num = 301
 ys = np.linspace(-0.3, 0.3, num)
-xs = np.repeat(lense2.x+lense2.f, num)
-print('screen x: '+ str(lense2.x+lense2.f))
+xs = np.repeat(1.0, num)
 #xs = np.repeat(4.8, num)
 screen = Surface(np.vstack((xs, ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
 screen.flip_normals()

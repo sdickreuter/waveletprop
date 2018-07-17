@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from numba import jit, jitclass, float64, int64, void, boolean, uint64
 import cmath
 
-# c = 2.998e8  # m/s
-c = 1.0  # m/s
+c = 2.998e8  # m/s
+#c = 1.0  # m/s
 
 modes = {
     "spherical": 1,
@@ -211,6 +211,12 @@ class Surface(object):
         for i in range(self.points.shape[0]-1):
             self.midpoints[i] = 0.5 * np.add(self.points[i], self.points[i + 1])
 
+    def _update_normals(self):
+        for i in range(self.points.shape[0]-1):
+            normal = self.rotate_vector(np.subtract(self.points[i], self.points[i + 1]), np.pi / 2)
+            normal /= np.linalg.norm(normal)
+            self.normals[i] = normal
+
 
     def flip_normals(self):
         for i in range(self.normals.shape[0]):
@@ -238,15 +244,23 @@ class Surface(object):
 
     def transmitted_k(self, k, normal):
         alpha =  self.angle_between(k, normal).real
-        #beta = cmath.sqrt(self.n2 ** 2 - self.n1 ** 2 * cmath.sin(alpha) ** 2).real / self.n2
-        #print((self.n1/self.n2) * np.sin(alpha))
-        beta = cmath.asin( (self.n1/self.n2) * np.sin(alpha) ).real
-        #transmitted = self.rotate_vector(normal, np.pi - beta)
+        #beta = cmath.asin( (self.n1/self.n2) * np.sin(alpha) ).real
+        beta = np.arcsin((self.n1 / self.n2) * np.sin(alpha))
         transmitted = self.rotate_vector(normal, beta)
+
+        # k = k/np.linalg.norm(k)
+        # r = self.n1/self.n2
+        # b = -np.dot(normal,k)
+        # if b <= 0:
+        #     normal = self.rotate_vector(normal,np.pi)
+        #     b =b*-1#= -np.dot(normal, k)
+        # transmitted = r*k+(r*b-np.sqrt(1-(r**2) * ((1-b)**2))*normal)
+
         return transmitted
 
     def rotate_vector(self, vector, theta):
         c, s = np.cos(theta), np.sin(theta)
+        #c, s = cmath.cos(theta).real, cmath.sin(theta).real
         R = np.zeros((2, 2))
         R[0, 0] = c
         R[1, 0] = -s
@@ -398,7 +412,12 @@ def angle_between(v1, v2):
 @jit()
 def rotate_vector(vector, theta):
     c, s = np.cos(theta), np.sin(theta)
-    R = np.array([[c, -s], [s, c]])
+    # c, s = cmath.cos(theta).real, cmath.sin(theta).real
+    R = np.zeros((2, 2))
+    R[0, 0] = c
+    R[1, 0] = -s
+    R[0, 1] = s
+    R[1, 1] = c
     return np.dot(R, vector)
 
 @jit()
@@ -425,13 +444,13 @@ def gen_concave_points(p0, r, height, num):
 
 class Lense(object):
 
-    def __init__(self, x, y, height, r=2.0, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
+    def __init__(self, x, y, r=2.0, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
         self.n1 = n1
         self.n2 = n2
         self.r = r
         self.x = x
         self.y = y
-        concave1, concave2 = self._generate_lens_points(num, height)
+        concave1, concave2 = self._generate_lens_points(num)
         concave1[:, 0] += x
         concave2[:, 0] += x
         concave1[:, 1] += y
@@ -441,19 +460,23 @@ class Lense(object):
         self.front.flip_normals()
         self.d = self.back.points[:, 0].max() - self.front.points[:, 0].min()
         self.f = self._calc_f()
+        print('d: '+str(self.d))
+        print('f: ' + str(self.f))
 
-    def _generate_lens_points(self, num, height):
+    def _generate_lens_points(self, num):
         p0 = np.array([0.0, 0.0])
-        concave1 = gen_concave_points(p0, -self.r, np.pi / 3, num)
-        concave1[:, 1] = concave1[:, 1] / concave1[:, 1].max()
-        concave1[:, 1] = concave1[:, 1] * (height / 2)
+        concave1 = gen_concave_points(p0, -self.r, np.pi , num)
+        #concave1[:, 1] = concave1[:, 1] / concave1[:, 1].max()
+        #concave1[:, 1] = concave1[:, 1] * (height / 2)
         concave1[:, 0] -= concave1[:, 0].max()
+        concave1[:, 0] -=  (concave1[:, 0].max()-concave1[:, 0].min())/4
 
         p0 = np.array([0.0, 0.0])
-        concave2 = gen_concave_points(p0, self.r, np.pi / 3, num)
-        concave2[:, 1] = concave2[:, 1] / concave2[:, 1].max()
-        concave2[:, 1] = concave2[:, 1] * (height / 2)
+        concave2 = gen_concave_points(p0, self.r, np.pi , num)
+        #concave2[:, 1] = concave2[:, 1] / concave2[:, 1].max()
+        #concave2[:, 1] = concave2[:, 1] * (height / 2)
         concave2[:, 0] -= concave2[:, 0].min()
+        concave2[:, 0] +=  (concave2[:, 0].max()-concave2[:, 0].min())/4
 
         return concave1, concave2
 
@@ -471,3 +494,66 @@ class Lense(object):
         self.front._update_midpoints()
         self.back._update_midpoints()
 
+    def flip(self):
+        alpha = np.pi
+        for i in range(self.front.points.shape[0]):
+            self.front.points[i,0] = self.front.points[i,0] - self.x
+            self.front.points[i, 1] = self.front.points[i, 1] - self.y
+            self.front.points[i, :] = rotate_vector(self.front.points[i, :],alpha)
+            self.front.points[i, 0] = self.front.points[i, 0] + self.x
+            self.front.points[i, 1] = self.front.points[i, 1] + self.y
+        for i in range(self.front.points.shape[0]):
+            self.back.points[i,0] = self.back.points[i,0] - self.x
+            self.back.points[i, 1] = self.back.points[i, 1] - self.y
+            self.back.points[i, :] = rotate_vector(self.back.points[i, :],alpha)
+            self.back.points[i, 0] = self.back.points[i, 0] + self.x
+            self.back.points[i, 1] = self.back.points[i, 1] + self.y
+        self.front._update_midpoints()
+        self.back._update_midpoints()
+        self.front._update_normals()
+        self.back._update_normals()
+
+        buf = self.front
+        self.front = self.back
+        self.back = buf
+
+        self.front.n1 = self.n1
+        self.front.n2 = self.n2
+        self.back.n1 = self.n2
+        self.back.n2 = self.n1
+
+
+class PlanConvex(Lense):
+
+    def __init__(self, x, y, r=2.0, reflectivity=0.0,transmittance=1.0, n1=1.0, n2=1.5, num=128):
+        self.n1 = n1
+        self.n2 = n2
+        self.r = r
+        self.x = x
+        self.y = y
+        concave1, concave2 = self._generate_lens_points(num)
+        concave1[:, 0] += x
+        concave1[:, 1] += y
+        self.front = Surface(concave1, reflectivity=reflectivity, transmittance=transmittance, n1=n1, n2=n2)
+        line = np.zeros(concave1.shape)
+        line[:, 0] = self.x
+        line[:, 1] = np.linspace(concave1[:,1].min(),concave1[:,1].max(),num)
+        self.back = Surface(line, reflectivity=reflectivity, transmittance=transmittance, n1=n2, n2=n1)
+
+        self.front.flip_normals()
+        self.back.flip_normals()
+
+        self.d = self.back.points[:, 0].max() - self.front.points[:, 0].min()
+        self.f = self._calc_f()
+        print('d: '+str(self.d))
+        print('f: ' + str(self.f))
+
+    def _calc_f_front(self):
+        f = self._calc_f()
+        h1 = -(f*(self.n2-1)*self.d)/( self.r*self.n2)
+        return self.front
+
+    def _calc_f_back(self):
+        f = self._calc_f()
+        h1 = -(f*(self.n2-1)*self.d)/( self.r*self.n2)
+        return self.front
