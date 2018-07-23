@@ -18,11 +18,11 @@ def make_planewave(num):
     rs = np.zeros((num, 2))
     rs[:, 0] = np.repeat(0.0, num)
 
-    rs[:, 1] = np.random.normal(0,0.5,num)
+    #rs[:, 1] = np.random.normal(0,0.5,num)
     #rs[:, 1] = np.random.rand(num)
-    #rs[:, 1] = np.linspace(0,1, num)
-    #rs[:, 1] *= 2
-    #rs[:, 1] -= 1
+    rs[:, 1] = np.linspace(0,1, num)
+    rs[:, 1] *= 1
+    rs[:, 1] -= 0.5
 
     ks = np.zeros((num, 2))
     ks[:, 0] = np.repeat(1.0, num)
@@ -31,7 +31,7 @@ def make_planewave(num):
     return Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
 
 
-plotit = False
+plotit = True
 
 num = 301
 
@@ -46,7 +46,7 @@ num = 301
 ys = np.linspace(-0.3, 0.3, num)
 #xs = np.repeat(lense1.x+lense1.f+lense1.d, num)
 #xs = np.repeat(3.63, num)
-xs = np.repeat(1.95, num)
+xs = np.repeat(1.97, num)
 screen = Surface(np.vstack((xs, ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
 screen.flip_normals()
 
@@ -93,16 +93,16 @@ if plotit:
     plt.show()
 
 
-    divider = 30
+    divider = 50
     #plt.plot(lense1.front.points[:, 0], pointsource.r[:, 1])
     for i in range(planewave.n):
         plt.plot(planewave.r[i,0], planewave.r[i,1], "bo")
         plt.arrow(planewave.r[i,0], planewave.r[i,1], planewave.k[i,0]/divider, planewave.k[i,1]/divider)
     plt.plot(lense1.front.points[:, 0], lense1.front.points[:, 1])
-    for i in range(onlense_front.n):
-        plt.plot(onlense_front.r[i,0], onlense_front.r[i,1], "bo")
-        plt.arrow(onlense_front.r[i,0], onlense_front.r[i,1], onlense_front.k[i,0]/(divider*20), onlense_front.k[i,1]/(divider*20))
-    plt.plot(lense1.back.points[:, 0], lense1.back.points[:, 1])
+    # for i in range(onlense_front.n):
+    #     plt.plot(onlense_front.r[i,0], onlense_front.r[i,1], "bo")
+    #     plt.arrow(onlense_front.r[i,0], onlense_front.r[i,1], onlense_front.k[i,0]/(divider*20), onlense_front.k[i,1]/(divider*20))
+    # plt.plot(lense1.back.points[:, 0], lense1.back.points[:, 1])
     for i in range(onlense_back.n):
         plt.plot(onlense_back.r[i, 0], onlense_back.r[i, 1], "bo")
         plt.arrow(onlense_back.r[i, 0], onlense_back.r[i, 1], onlense_back.k[i, 0] / divider, onlense_back.k[i, 1] / divider)
@@ -135,15 +135,15 @@ if plotit:
 # plt.plot(hits)
 # plt.show()
 
-iterations = 1000
+iterations = 5000
 prog = progress.Progress(max=iterations)
 
 for i in range(iterations):
-    #pointsource = make_planewave(num)
+    pointsource = make_planewave(num)
     # onlense1.mode = modes['gaussian']
-    #onlense1_front = lense1.front.interact_with_all_wavelets(pointsource)
+    onlense1_front = lense1.front.interact_with_all_wavelets(pointsource)
     # print("onlense1: "+ str(onlense1.n))
-    #onlense1_back = lense1.back.interact_with_all_wavelets(onlense1_front)
+    onlense1_back = lense1.back.interact_with_all_wavelets(onlense1_front)
     # print("onlense2: "+ str(onlense2.n))
     onlense_back.mode = modes['gaussian']
     onscreen = screen.interact_with_all_wavelets(onlense_back)

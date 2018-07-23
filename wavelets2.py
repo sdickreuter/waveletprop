@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from numba import jit, jitclass, float64, int64, void, boolean, uint64
 import cmath
 
-c = 2.998e8  # m/s
-#c = 1.0  # m/s
+#c = 2.998e8  # m/s
+c = 1.0  # m/s
 
 modes = {
     "spherical": 1,
@@ -328,6 +328,7 @@ class Surface(object):
 
             if not absorbed:
                 t = wavelets.calc_t_of_wavelet(index,position,self.n1)
+                k = k / np.linalg.norm(k) * 2 * np.pi / wavelets.wavelength
                 return position, k, t, True
 
         return np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0.0, False
@@ -386,6 +387,8 @@ class Surface(object):
 
         indices = (hits > 0)
         # (self, r, k, t0, wavelength, phases, mode):
+        # for i in indices:
+        #     ks[i,:] = ks[i,:] / np.linalg.norm(ks[i,:]) * 2 * np.pi / wavelets.wavelength
         new_wavelets = Wavelets(rs[indices,:],ks[indices,:],ts[indices],wavelets.wavelength,wavelets.phases[indices],wavelets.mode)
         return new_wavelets
 
