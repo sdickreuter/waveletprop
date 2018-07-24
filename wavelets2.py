@@ -4,7 +4,7 @@ locale.setlocale(locale.LC_NUMERIC, 'C')
 
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import jit, jitclass, float64, int64, void, boolean, uint64
+from numba import jit, jitclass, float64, int64, void, boolean, uint64, complex128
 import cmath
 
 #c = 2.998e8  # m/s
@@ -16,6 +16,44 @@ modes = {
     "ray": 3,
     "dipolar": 4,
 }
+
+@jit()
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+@jit()
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    # return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+    v = np.dot(v1_u, v2_u)
+    if v > 1.0:
+        v = 1.0
+    elif v < -1.0:
+        v = -1.0
+    # return np.arccos(v)
+    return cmath.acos(v)
+
+@jit()
+def rotate_vector(vector, theta):
+    c, s = np.cos(theta), np.sin(theta)
+    # c, s = cmath.cos(theta).real, cmath.sin(theta).real
+    R = np.zeros((2, 2))
+    R[0, 0] = c
+    R[1, 0] = -s
+    R[0, 1] = s
+    R[1, 1] = c
+    return np.dot(R, vector)
+
+@jit()
+def gen_rotation_matrix(theta):
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array([[c, -s], [s, c]])
+    return R
+
 
 
 spec_Wavelets = [
@@ -52,25 +90,26 @@ class Wavelets(object):
     #         return 0.0
 
     def calc_t_of_wavelet(self, index, point, n=1.0):
-        return np.sqrt(np.sum(np.square(np.subtract(self.r[index,:], point)))) / (c/n)
+        return np.sqrt(np.sum(np.square(np.subtract(self.r[index,:], point)))) / (c/n)+self.t0[index]
 
     def calc_field(self, points, t, n=1.0):
         f = (c/n) / self.wavelength
-        field = np.zeros(points.shape[0],dtype=np.complex128)
+        field = np.zeros(points.shape[0],dtype=np.float64)
         for j in range(points.shape[0]):
             for i in range(self.n):
-                r = np.linalg.norm(self.r[i,:] - points[j,:])
+                r = self.r[i,:] - points[j,:]
                 #theta = self.angle_between(np.subtract(points[j,:],self.r[i,:]),self.k[i,:]).real
                 #field[j] += cmath.cos(theta).real/r * cmath.exp(1j * (np.linalg.norm(self.k[i,:]) * r - 1j*2 * cmath.pi * f * (t - self.t0[i]) + self.phases[i])).real
-                field[j] += 1 / r * cmath.exp(1j * ( ( np.linalg.norm(self.k[i, :]) * r
+                field[j] += 1 / r * cmath.exp(1j * ( ( np.dot(self.k[i, :],r)
                                                      - 2 * cmath.pi * ((c/n)/self.wavelength) * (t - self.t0[i]) + self.phases[i])))
         return np.real(field)
 
     def field_at_r(self,index,t):
         n = 1.0
         f = (c/n) / self.wavelength
-        field = cmath.exp( 1j * ( np.dot(self.k[index, :],self.r[index,:]) - 2 * cmath.pi * f * (t - self.t0[index]) + self.phases[index]))
-        return np.real(field)
+        #field = np.real( cmath.exp( 1j * ( np.dot(self.k[index, :],self.r[index,:]) - 2 * cmath.pi * f * (t - self.t0[index]) + self.phases[index])))
+        field = np.real(cmath.exp(1j *( -2 * cmath.pi * f * (t - self.t0[index]) + self.phases[index])))
+        return field#*rotate_vector(self.k[index,:],np.pi/2) / np.linalg.norm(self.k[index,:])
 
 
     def calc_probability_of_wavelet(self,index, point1, point2):
@@ -181,7 +220,7 @@ spec_Surface = [
     ('n1', float64),
     ('n2', float64),
     ('midpoints', float64[:, :]),
-    ('field', float64[:]),
+    ('field', float64[:,:]),
     ('hits', int64[:]),
     ('normals', float64[:, :]),
     ('count', int64),
@@ -203,7 +242,7 @@ class Surface(object):
             normal /= np.linalg.norm(normal)
             self.normals[i] = normal
 
-        self.field = np.zeros(self.midpoints.shape[0])
+        self.field = np.zeros((self.midpoints.shape[0],2),np.float64)
         self.hits = np.zeros(self.midpoints.shape[0],dtype=np.int64)
         self.count = 0
 
@@ -354,17 +393,23 @@ class Surface(object):
     #     return rs[indices,:], ints[indices]
 
     def add_field_from_wavelets(self,wavelets):
+        #field = np.zeros((wavelets.n,2), dtype=np.float64)
         field = np.zeros(wavelets.n, dtype=np.float64)
         self.count += wavelets.n
         for i in range(wavelets.n):
+            #field[i,:] = wavelets.field_at_r(i,1.0)
             field[i] = wavelets.field_at_r(i,1.0)
+
 
         for i in range(len(field)):
             for j in range(self.field.shape[0]):
-                if ((wavelets.r[i, 1] > self.points[j, 1]) and (wavelets.r[i, 1] < self.points[j + 1, 1])) \
-                            or ((wavelets.r[i, 0] > self.points[j, 0]) and (wavelets.r[i, 0] < self.points[j + 1, 0])):
-                    self.field[j] += field[i]*np.dot(self.rotate_vector(wavelets.k[i,:],np.pi/2),np.subtract(self.points[j+1,:],self.points[j,:]))
-                    #self.field[j] += field[i]*np.dot(wavelets.k[i,:],self.normals[j,:])
+                #if ((wavelets.r[i, 1] > self.points[j, 1]) and (wavelets.r[i, 1] < self.points[j + 1, 1])) \
+                #            or ((wavelets.r[i, 0] > self.points[j, 0]) and (wavelets.r[i, 0] < self.points[j + 1, 0])):
+                if ((wavelets.r[i, 1] > self.points[j, 1]) and (wavelets.r[i, 1] < self.points[j + 1, 1])):
+                    #self.field[j] += field[i]*np.dot(self.rotate_vector(wavelets.k[i,:],np.pi/2),(self.points[j, :]-self.points[j+1, :]))
+                    #self.field[j] += field[i]#*np.dot(wavelets.k[i,:],self.normals[j,:])
+                    self.field[j] += field[i]#*np.sin(np.real(angle_between(self.rotate_vector(wavelets.k[i,:],np.pi/2),(self.points[j+1, :]-self.points[j, :]))))
+
                     self.hits[j] += 1
 
     def interact_with_all_wavelets(self, wavelets):
@@ -391,60 +436,6 @@ class Surface(object):
         #     ks[i,:] = ks[i,:] / np.linalg.norm(ks[i,:]) * 2 * np.pi / wavelets.wavelength
         new_wavelets = Wavelets(rs[indices,:],ks[indices,:],ts[indices],wavelets.wavelength,wavelets.phases[indices],wavelets.mode)
         return new_wavelets
-
-@jit()
-def unit_vector(vector):
-    """ Returns the unit vector of the vector.  """
-    return vector / np.linalg.norm(vector)
-
-@jit()
-def angle_between(v1, v2):
-    """ Returns the angle in radians between vectors 'v1' and 'v2'::
-    """
-    v1_u = unit_vector(v1)
-    v2_u = unit_vector(v2)
-    # return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
-    v = np.dot(v1_u, v2_u)
-    if v > 1.0:
-        v = 1.0
-    elif v < -1.0:
-        v = -1.0
-    # return np.arccos(v)
-    return cmath.acos(v)
-
-@jit()
-def rotate_vector(vector, theta):
-    c, s = np.cos(theta), np.sin(theta)
-    # c, s = cmath.cos(theta).real, cmath.sin(theta).real
-    R = np.zeros((2, 2))
-    R[0, 0] = c
-    R[1, 0] = -s
-    R[0, 1] = s
-    R[1, 1] = c
-    return np.dot(R, vector)
-
-@jit()
-def gen_rotation_matrix(theta):
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array([[c, -s], [s, c]])
-    return R
-
-
-@jit()
-def gen_concave_points(p0, r, height, num):
-    if height > np.abs(r):
-        height = np.abs(r)
-    v = [r,0]
-    theta_max = np.arcsin(height/r)
-    thetas = np.linspace(theta_max, -theta_max, num)
-    points = np.zeros((num, 2))
-    for i, theta in enumerate(thetas):
-        R = gen_rotation_matrix(theta)
-        buf = np.dot(R, v)
-        points[i] = p0 + buf
-    return points
-
-
 
 
 class Lense(object):
@@ -493,11 +484,24 @@ class Lense(object):
         print('d: '+str(self.d))
         print('f: ' + str(self.f))
 
+    def _gen_concave_points(self, p0, r, height, num):
+        if height > np.abs(r):
+            height = np.abs(r)
+        v = [r, 0]
+        theta_max = np.arcsin(height / r)
+        thetas = np.linspace(theta_max, -theta_max, num)
+        points = np.zeros((num, 2))
+        for i, theta in enumerate(thetas):
+            R = gen_rotation_matrix(theta)
+            buf = np.dot(R, v)
+            points[i] = p0 + buf
+        return points
+
     def _generate_lens_points(self,r,height, num):
 
         if (r is not np.inf) and (r is not -np.inf):
             p0 = np.array([0.0, 0.0])
-            points1 = gen_concave_points(p0, r, height, num)
+            points1 = self._gen_concave_points(p0, r, height, num)
             if r > 0:
                 points1[:, 0] -= points1[:, 0].min()
             else:

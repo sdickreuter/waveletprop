@@ -28,29 +28,30 @@ def make_planewave(num):
     ks[:, 0] = np.repeat(1.0, num)
     t0s = np.zeros((num))
     phases = np.zeros((num))
-    return Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.1, phases=phases, mode=modes['ray'])
+    return Wavelets(r=rs, k=ks, t0=t0s, wavelength=0.03, phases=phases, mode=modes['ray'])
 
 
 plotit = True
 
-num = 301
+num = 500
 
 #lense1 = Lense(x=0.5, y=0, height=2.0, num=num)
-#lense1 = Lense(x=0.0, y=0,r1=-1.0,r2=np.inf,height=0.5, num=num)
-lense1 = Lense(x=0.0, y=0,r1=-1.0,r2=1.0,height=0.5, num=num)
-lense1.shift(dx=lense1._calc_f_front()+lense1.front.points[:,0].min())
+lense1 = Lense(x=0.0, y=0,r1=-1.0,r2=np.inf,height=0.5, num=num)
+#lense1 = Lense(x=0.0, y=0,r1=-1.0,r2=1.0,height=0.5, num=num)
+#lense1.shift(dx=lense1._calc_f_front()+lense1.front.points[:,0].min())
+lense1.shift(dx=1.0)
 
 print(lense1.f)
 
-num = 301
+num = 500
 ys = np.linspace(-0.3, 0.3, num)
 #xs = np.repeat(lense1.x+lense1.f+lense1.d, num)
-#xs = np.repeat(3.63, num)
-xs = np.repeat(1.97, num)
+#xs = np.repeat(2.075, num)
+xs = np.repeat(2.85, num)
 screen = Surface(np.vstack((xs, ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
 screen.flip_normals()
 
-num = 301
+num = 500
 xs = np.linspace(1.0, 3, num)
 ys = np.repeat(0, num)
 screen2 = Surface(np.vstack((xs, ys)).T, reflectivity=0.0, transmittance=1.0, n1=1.0, n2=1.0)
@@ -84,7 +85,7 @@ screen2.add_field_from_wavelets(onscreen2)
 
 if plotit:
     plt.plot(onlense_front.t0)
-    plt.show()
+    #plt.show()
 
     plt.plot(onlense_back.t0)
     plt.show()
@@ -93,7 +94,7 @@ if plotit:
     plt.show()
 
 
-    divider = 50
+    divider = 25
     #plt.plot(lense1.front.points[:, 0], pointsource.r[:, 1])
     for i in range(planewave.n):
         plt.plot(planewave.r[i,0], planewave.r[i,1], "bo")
@@ -135,7 +136,7 @@ if plotit:
 # plt.plot(hits)
 # plt.show()
 
-iterations = 5000
+iterations = 1000
 prog = progress.Progress(max=iterations)
 
 for i in range(iterations):
@@ -161,8 +162,11 @@ for i in range(iterations):
     print(str(np.round(prog.percent,1))+'%  ' + str(prog.eta_td))
 
 
-plt.plot(screen.midpoints[:,1],screen.field ** 2)
+plt.plot(screen.midpoints[:,1],np.absolute(screen.field[:,1]) ** 2)
 plt.savefig("wavelet_lense5_screeny.png", dpi=600)
+plt.show()
+
+plt.plot(screen.midpoints[:,1],screen.hits)
 plt.show()
 
 # plt.plot(screen2.midpoints[:,0],screen2.hits)
